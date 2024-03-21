@@ -9,8 +9,7 @@ from pathlib import Path
 
 import requests
 
-DeptName = "Soil and Water Conservation Department"
-
+DeptNames = ["Soil and Water Conservation Department", "Soil & Water Conservation Department"]
 
 def request_pdf(url, pdf_file):
     downloaded, dt_str = False, None
@@ -39,13 +38,27 @@ def main():
     assert link_dir.exists()
 
     all_infos = json.loads(all_info_path.read_text())
-    dept_infos = [i for i in all_infos if i["Department Name"] == DeptName]
+    dept_infos = [i for i in all_infos if i["Department Name"] in DeptNames]
+
+    for info in dept_infos:
+        info['Unique Code'] = info['Unique Code'].replace('\u200d', '')
 
     doc_infos = json.loads(doc_info_path.read_text()) if doc_info_path.exists() else []
     doc_set = set(i["Unique Code"] for i in doc_infos)
     doc_dir = doc_info_path.parent
 
     new_infos = [i for i in dept_infos if i["Unique Code"] not in doc_set]
+    if len(new_infos) != len(set(i["Unique Code"] for i in new_infos)):
+        # removing duplicate infos, happens rarely.
+        unique_infos, duplicate_codes, seen = [], [], set()
+        for info in new_infos:
+            if info['Unique Code'] not in seen:
+                unique_infos.append(info)
+                seen.add(info["Unique Code"])
+            else:
+                duplicate_codes.append(info["Unique Code"])
+        print(f'Duplicates infos found: {",".join(duplicate_codes)}, keeping unique.')
+        new_infos = unique_infos
 
     for info in new_infos:
         doc_path = doc_dir / f"{info['Unique Code']}.pdf"
